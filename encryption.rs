@@ -19,22 +19,35 @@ fn generate_encryption_key_and_iv() -> (Vec<u8>, Vec<u8>) {
 pub fn encrypt_file_at_path(file_path: &str, encrypted_file_path: &str) -> Result<(), Error> {
     let file_contents = fs::read(file_path)?;
     let (encryption_key, initialization_vector) = generate_encryption_key_and_iv();
-    let cipher = Aes256CbcEncryption::new_from_slices(&encryption_key, &initialization_vector).unwrap();
+
+    let cipher = match Aes256CbcEncryption::new_from_slices(&encryption_key, &initialization_vector) {
+        Ok(c) => c,
+        Err(e) => return Err(Error::new(std::io::ErrorKind::Other, e)),
+    };
+
     let encrypted_data = cipher.encrypt_vec(&file_contents);
     
     let mut encrypted_file = File::create(encrypted_file_path)?;
     encrypted_file.write_all(&initialization_vector)?;
+    encrypted_file.write_all(&encryption_key)?; 
     encrypted_file.write_all(&encrypted_data)?;
     Ok(())
 }
 
-pub fn decrypt_file_at_path(encrypted_file_path: &str, decrypted_file_path: &str, encryption_key: &[u8], initialization_vector: &[u8]) -> Result<(), Error> {
+pub fn decrypt_file_at_path(encrypted_file_path: &str, decrypted_file_path: &str) -> Result<(), Error> {
     let encrypted_file_contents = fs::read(encrypted_file_path)?;
-    if encrypted_file_contents.len() < 16 {
-        return Err(Error::new(std::io::ErrorKind::InvalidInput, "Encrypted file is too short to be valid."));
+    if encrypted_file_contents.len() < 48 { 
+        return Err(Error::new(std::io::ErrorKind::InvalidInput, "Encrypted file is too short."));
     }
-    let cipher = Aes256CbcEncryption::new_from_slices(encryption_key, initialization_vector).unwrap();
-    let decrypted_data = cipher.decrypt_vec(&encrypted_file_contents[16..])?;
+    let (initialization_vector, rest) = encrypted_file_contents.split_at(16);
+    let (encryption_key, encrypted_data) = rest.split_at(32);
+
+    let cipher = match Aes256CbcEncryption::new_from_slices(encryption_key, initialization_vector) {
+        Ok(c) => c,
+        Err(e) => return Err(Error::new(std::io::ErrorKind::Other, e)),
+    };
+
+    let decrypted_data = cipher.decrypt_vec(encrypted_data)?;
     fs::write(decrypted_file_path, decrypted_data)?;
     Ok(())
 }
