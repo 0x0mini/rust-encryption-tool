@@ -30,8 +30,15 @@ pub fn can_write_file(path: &str) -> Result<(), String> {
 pub fn log_info(message: &str) {
     match env::var("LOG_PATH") {
         Ok(path) => {
-            if let Ok(mut file) = fs::OpenOptions::new().append(true).create(true).open(path) {
-                writeln!(file, "INFO: {}", message).expect("Failed to write to log file.");
+            let mut file = match fs::OpenOptions::new().append(true).create(true).open(&path) {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("Failed to open log file at {}. Error: {}", path, e);
+                    return;
+                }
+            };
+            if writeln!(file, "INFO: {}", message).is_err() {
+                eprintln!("Failed to write to log file at {}", path);
             }
         },
         Err(_) => println!("INFO: {}", message),
@@ -41,8 +48,15 @@ pub fn log_info(message: &str) {
 pub fn log_error(message: &str) {
     match env::var("LOG_PATH") {
         Ok(path) => {
-            if let Ok(mut file) = fs::OpenOptions::new().append(true).create(true).open(path) {
-                writeln!(file, "ERROR: {}", message).expect("Failed to write to log file.");
+            let mut file = match fs::OpenOptions::new().append(true).create(true).open(&path) {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("Failed to open log file for error logging at {}. Error: {}", path, e);
+                    return;
+                }
+            };
+            if writeln!(file, "ERROR: {}", message).is_err() {
+                eprintln!("Failed to write error to log file at {}", path);
             }
         },
         Err(_) => eprintln!("ERROR: {}", message),
