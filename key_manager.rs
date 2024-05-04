@@ -4,6 +4,7 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
+use std::num::ParseIntError;
 
 const DEFAULT_KEY_LENGTH: usize = 32;
 const ENCRYPTION_KEY_FILENAME: &str = "encryption_key";
@@ -12,6 +13,7 @@ const ENCRYPTION_KEY_FILENAME: &str = "encryption_key";
 enum EncryptionError {
     Io(io::Error),
     CryptoError(Unspecified),
+    Parse(ParseIntError),
 }
 
 impl From<io::Error> for EncryptionError {
@@ -26,15 +28,21 @@ impl From<Unspecified> for EncryptionError {
     }
 }
 
+impl From<ParseIntError> for EncryptionError {
+    fn from(error: ParseIntError) -> Self {
+        EncryptionError::Parse(error)
+    }
+}
+
 pub fn generate_encryption_key() -> Result<Vec<u8>, EncryptionError> {
     let key_length_env = env::var("KEY_LENGTH")
         .unwrap_or_else(|_| DEFAULT_KEY_LENGTH.to_string())
-        .parse()
-        .unwrap_or(DEFAULT_KEY_LENGTH);
+        .parse::<usize>()?;
 
     let rng = SystemRandom::new();
     let mut key = vec![0u8; key_length_env];
-    rng.fill(&mut key).map_err(EncryptionError::from)?;
+    rng.fill(&mut key)?;
+    
     Ok(key)
 }
 
