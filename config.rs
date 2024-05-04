@@ -2,7 +2,7 @@ use config::{Config, ConfigError, File, Environment};
 use serde::Deserialize;
 use std::{
     path::PathBuf,
-    fmt,
+    fmt::{self, Display},
     error::Error,
 };
 
@@ -19,7 +19,7 @@ enum SettingsError {
     EnvVar(std::env::VarError),
 }
 
-impl fmt::Display for SettingsError {
+impl Display for SettingsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SettingsError::Config(e) => write!(f, "Configuration error: {}", e),
@@ -28,14 +28,7 @@ impl fmt::Display for SettingsError {
     }
 }
 
-impl Error for SettingsError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            SettingsError::Config(e) => Some(e),
-            SettingsError::EnvVar(e) => Some(e),
-        }
-    }
-}
+impl Error for SettingsError {}
 
 impl From<ConfigError> for SettingsError {
     fn from(e: ConfigError) -> Self {
@@ -53,8 +46,10 @@ impl Settings {
     pub fn new() -> Result<Self, SettingsError> {
         let mut s = Config::new();
         s.merge(File::with_name("config/default").required(false))?;
-        let environment = std::env::var("RUN_MODE").map_err(SettingsError::from)?;
-        s.merge(File::with_name(&format!("config/{}", environment)).required(false))?;
+
+        let run_mode = std::env::var("RUN_MODE").unwrap_or_else(|_| "default".into());
+        s.merge(File::with_name(&format!("config/{}", run_mode)).required(false))?;
+
         s.merge(Environment::with_prefix("APP").separator("__"))?;
         s.try_into().map_err(SettingsError::from)
     }
