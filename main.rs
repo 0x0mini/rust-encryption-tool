@@ -1,6 +1,7 @@
 use clap::{App, Arg};
 use std::fs;
 use std::io::{self, Error, ErrorKind};
+use std::path::PathBuf;
 
 mod encryption;
 
@@ -9,10 +10,12 @@ fn main() {
 
     let operation = matches.value_of("action").expect("Action argument is required");
     let source_file_path = matches.value_of("source_path").expect("Source file path argument is required");
-    let destination_file_path = matches.value_of("destination_path").expect("Destination file path argument is required");
+    let mut destination_file_path = matches.value_of("destination_path").expect("Destination file path argument is required").to_string();
     let cipher_key = matches.value_of("encryption_key").expect("Encryption key argument is required").as_bytes();
 
-    if let Err(error) = process_file(operation, source_file_path, destination_file_path, cipher_key) {
+    destination_file_path = change_file_extension_based_on_operation(operation, &destination_file_path);
+
+    if let Err(error) = process_file(operation, source_file_path, &destination_file_path, cipher_key) {
         eprintln!("Error occurred while processing the file: {}", error);
     }
 }
@@ -63,6 +66,18 @@ fn encrypt_or_decrypt_file(source_file_path: &str, destination_file_path: &str, 
     fs::write(destination_file_path, processed_content)?;
     println!("{}", success_message);
     Ok(())
+}
+
+fn change_file_extension_based_on_operation(operation: &str, file_path: &str) -> String {
+    let mut path = PathBuf::from(file_path);
+
+    match operation {
+        "encrypt" => path.set_extension("encrypted"),
+        "decrypt" => path.set_extension("decrypted"),
+        _ => {}
+    };
+
+    path.to_str().unwrap_or(file_path).to_string()
 }
 
 mod encryption {
